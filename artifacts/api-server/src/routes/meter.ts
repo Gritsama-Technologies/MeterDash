@@ -3,13 +3,13 @@ import express from "express";
 import {
   parseMeterFrame,
   MalformedFrameError,
-} from "../lib/parser";
+} from "../lib/parser.js";
 import {
   recordFrame,
   getLatest,
   getHistory,
   getSummary,
-} from "../lib/meterStore";
+} from "../lib/meterStore.js";
 
 const router: IRouter = Router();
 

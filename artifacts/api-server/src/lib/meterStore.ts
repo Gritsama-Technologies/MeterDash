@@ -1,4 +1,4 @@
-import type { ParsedMeterPayload, MeterValue } from "./parser";
+import type { ParsedMeterPayload, MeterValue } from "./parser.js";
 
 const HISTORY_LIMIT = 60;
 
