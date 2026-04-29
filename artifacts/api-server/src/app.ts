@@ -30,6 +30,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/", (_req, res) => {
+  const dashboardUrl = process.env["METER_DASHBOARD_URL"];
+
+  if (dashboardUrl) {
+    res.redirect(307, dashboardUrl);
+    return;
+  }
+
+  res.status(200).json({
+    service: "api-server",
+    health: "/api/healthz",
+    message: "Set METER_DASHBOARD_URL to redirect root to your dashboard.",
+  });
+});
+
 app.use("/api", router);
+app.use(router);
 
 export default app;
