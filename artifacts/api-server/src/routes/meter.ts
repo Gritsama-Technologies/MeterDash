@@ -1,12 +1,6 @@
 import { Router, type IRouter } from "express";
 import express from "express";
 import {
-  GetLatestMeterDataResponse,
-  GetMeterHistoryResponse,
-  GetMeterSummaryResponse,
-  IngestMeterDataResponse,
-} from "@workspace/api-zod";
-import {
   parseMeterFrame,
   MalformedFrameError,
 } from "../lib/parser";
@@ -21,8 +15,7 @@ const router: IRouter = Router();
 
 router.get("/data", (_req, res) => {
   const latest = getLatest();
-  const data = GetLatestMeterDataResponse.parse(latest);
-  res.json(data);
+  res.json(latest);
 });
 
 router.post(
@@ -49,8 +42,7 @@ router.post(
     try {
       const payload = parseMeterFrame(raw);
       recordFrame(payload);
-      const data = IngestMeterDataResponse.parse(payload);
-      res.json(data);
+      res.json(payload);
     } catch (err) {
       if (err instanceof MalformedFrameError) {
         req.log.warn({ err: err.message }, "Malformed meter frame");
@@ -64,14 +56,12 @@ router.post(
 
 router.get("/history", (_req, res) => {
   const history = getHistory();
-  const data = GetMeterHistoryResponse.parse(history);
-  res.json(data);
+  res.json(history);
 });
 
 router.get("/summary", (_req, res) => {
   const summary = getSummary();
-  const data = GetMeterSummaryResponse.parse(summary);
-  res.json(data);
+  res.json(summary);
 });
 
 export default router;
