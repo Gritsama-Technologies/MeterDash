@@ -29,7 +29,13 @@ export function TestFramePanel({ defaultOpen = false }: { defaultOpen?: boolean 
         toast.success("Test frame sent successfully");
       },
       onError: (err) => {
-        toast.error("Failed to send frame: " + (err.error || "Unknown error"));
+        const message =
+          err && typeof err === "object" && "data" in err && err.data && typeof err.data === "object" && "error" in err.data
+            ? String((err.data as { error: unknown }).error)
+            : err instanceof Error
+              ? err.message
+              : "Unknown error";
+        toast.error("Failed to send frame: " + message);
       }
     }
   });

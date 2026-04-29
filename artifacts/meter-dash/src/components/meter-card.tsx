@@ -22,6 +22,7 @@ export function ParameterRow({ label, value, unit, decimals = 2, description }: 
       prevValue.current = value;
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [value]);
 
   return (
@@ -48,10 +49,10 @@ export function ParameterRow({ label, value, unit, decimals = 2, description }: 
 export function MeterCard({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <Card className={cn("flex flex-col h-full bg-card/80 backdrop-blur-sm border-border/50 shadow-sm", className)}>
-      <CardHeader className="py-3 px-4 border-b border-border/50 bg-muted/20">
-        <CardTitle className="text-sm font-semibold tracking-wide text-foreground/90 uppercase">{title}</CardTitle>
+      <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 border-b border-border/50 bg-muted/20">
+        <CardTitle className="text-xs sm:text-sm font-semibold tracking-wide text-foreground/90 uppercase">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-4 flex flex-col gap-1">
+      <CardContent className="flex-1 p-3 sm:p-4 flex flex-col gap-1">
         {children}
       </CardContent>
     </Card>

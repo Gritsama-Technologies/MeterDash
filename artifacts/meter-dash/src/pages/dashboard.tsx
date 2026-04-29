@@ -53,26 +53,26 @@ export default function Dashboard() {
 
   if (noData) {
     return (
-      <div className="min-h-screen flex flex-col bg-background text-foreground p-6">
-        <header className="flex items-center justify-between border-b border-border/50 pb-4 mb-10">
+      <div className="min-h-screen flex flex-col bg-background text-foreground p-4 sm:p-6">
+        <header className="flex items-center justify-between border-b border-border/50 pb-4 mb-6 sm:mb-10">
           <div className="flex items-center gap-2">
-            <ActivitySquare className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold tracking-tight">MeterDash</h1>
+            <ActivitySquare className="h-5 sm:h-6 w-5 sm:w-6 text-primary" />
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight">MeterDash</h1>
           </div>
         </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center max-w-xl mx-auto w-full text-center space-y-8">
+        <main className="flex-1 flex flex-col items-center justify-center max-w-xl mx-auto w-full text-center space-y-6 sm:space-y-8 px-2">
           <div className="space-y-4">
-            <div className="h-20 w-20 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Radio className="h-10 w-10 text-muted-foreground animate-pulse" />
+            <div className="h-16 w-16 sm:h-20 sm:w-20 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <Radio className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground animate-pulse" />
             </div>
-            <h2 className="text-2xl font-bold">Waiting for telemetry...</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              The dashboard is actively polling. Point your meter to <code className="bg-muted px-1.5 py-0.5 rounded text-primary">POST /api/data</code> with a raw telemetry frame, or send a test frame below to see the UI come to life.
+            <h2 className="text-xl sm:text-2xl font-bold">Waiting for telemetry...</h2>
+            <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto">
+              The dashboard is actively polling. Point your meter to <code className="bg-muted px-1.5 py-0.5 rounded text-primary text-xs sm:text-sm break-all">POST /api/data</code> with a raw telemetry frame, or send a test frame below to see the UI come to life.
             </p>
           </div>
           
-          <div className="w-full mt-8 max-w-lg">
+          <div className="w-full mt-6 sm:mt-8 max-w-lg">
             <TestFramePanel defaultOpen={true} />
           </div>
         </main>
@@ -90,23 +90,23 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Header Band */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-3 bg-card/95 backdrop-blur-md border-b border-border shadow-sm">
-        <div className="flex items-center gap-3">
-          <ActivitySquare className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-bold tracking-tight">MeterDash</h1>
-          <div className="h-4 w-px bg-border mx-2" />
-          <Badge variant="outline" className="font-mono text-xs text-muted-foreground bg-muted/20">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-y-2 gap-x-3 px-3 sm:px-6 py-3 bg-card/95 backdrop-blur-md border-b border-border shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <ActivitySquare className="h-5 w-5 text-primary shrink-0" />
+          <h1 className="text-base sm:text-lg font-bold tracking-tight">MeterDash</h1>
+          <div className="h-4 w-px bg-border mx-1 sm:mx-2 hidden xs:block" />
+          <Badge variant="outline" className="font-mono text-[10px] sm:text-xs text-muted-foreground bg-muted/20 truncate">
             {latestData.meterId || "UNKNOWN"}
           </Badge>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 sm:gap-4 ml-auto">
+          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             <span className="font-mono tabular-nums">{relativeTime}</span>
           </div>
           <div className={cn(
-            "flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border",
+            "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold uppercase tracking-wider border",
             isStale 
               ? "bg-destructive/10 text-destructive border-destructive/20" 
               : "bg-success/10 text-success border-success/20"
@@ -115,12 +115,18 @@ export default function Dashboard() {
             {isStale ? "Stale" : "Live"}
           </div>
         </div>
+
+        {/* Mobile-only relative time row */}
+        <div className="sm:hidden w-full flex items-center gap-2 text-xs text-muted-foreground -mt-1">
+          <Clock className="h-3.5 w-3.5" />
+          <span className="font-mono tabular-nums">{relativeTime}</span>
+        </div>
       </header>
 
-      <main className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
+      <main className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto w-full">
         {/* Hero Summary Strip */}
         {s && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
             <SummaryMetric label="Current Load" value={formatValue(d.KW, 2)} unit="kW" />
             <SummaryMetric label="Peak Load" value={formatValue(s.peakKw, 2)} unit="kW" />
             <SummaryMetric label="Avg PF" value={formatValue(s.avgPf, 3)} />
@@ -131,7 +137,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           
           {/* Voltage */}
           <MeterCard title="Voltage" className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-75 fill-mode-both">
@@ -251,8 +257,8 @@ export default function Dashboard() {
         </div>
 
         {/* Footer / Utilities */}
-        <div className="pt-8 pb-4 flex justify-end">
-          <div className="w-80">
+        <div className="pt-6 sm:pt-8 pb-4 flex justify-stretch sm:justify-end">
+          <div className="w-full sm:w-80">
             <TestFramePanel />
           </div>
         </div>
