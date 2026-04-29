@@ -1,23 +1,33 @@
 ###############################################################################
-# Netlify configuration — frontend only (artifacts/meter-dash)
+# Netlify configuration — single-deploy: dashboard + API on the same site.
 #
-# The backend (artifacts/api-server) is a stateful Express service with an
-# in-memory frame store. It is NOT deployed to Netlify. Host it on a
-# long-running Node platform (Render / Railway / Fly.io) and point the
-# frontend at it via the VITE_API_BASE_URL build variable.
+# - Static React/Vite SPA from `artifacts/meter-dash`
+# - API served by a Netlify Function at `/api/*` (in-memory store)
 ###############################################################################
 
 [build]
-  base    = "."
-  publish = "artifacts/meter-dash/dist/public"
-  command = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-spec run codegen && BASE_PATH=/ PORT=4173 pnpm --filter @workspace/meter-dash run build"
+  base      = "."
+  publish   = "artifacts/meter-dash/dist/public"
+  functions = "netlify/functions"
+  command   = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-spec run codegen && BASE_PATH=/ PORT=4173 pnpm --filter @workspace/meter-dash run build"
 
 [build.environment]
-  NODE_VERSION  = "20"
-  PNPM_VERSION  = "9"
-  NPM_FLAGS     = "--version"   # tell Netlify to skip its npm install step
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9"
+  NPM_FLAGS    = "--version"
 
-# SPA fallback so client-side routes (wouter) resolve correctly
+[functions]
+  node_bundler = "esbuild"
+
+# Belt-and-suspenders: even though the function declares `config.path`,
+# we add an explicit rewrite so /api/* always lands on the function
+# before the SPA fallback runs.
+[[redirects]]
+  from   = "/api/*"
+  to     = "/.netlify/functions/api/:splat"
+  status = 200
+
+# SPA fallback for client-side routes (wouter)
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

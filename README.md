@@ -1,174 +1,70 @@
 # MeterDash
 
-Real-time dashboard for electrical meter telemetry. The backend ingests raw
-`frame$...,Z` strings from a meter, parses them, keeps the last 60 frames in
-memory, and exposes them over a small JSON API. The frontend polls every 2
-seconds and renders voltage, current, power, harmonics, energy, and system
-health with live sparklines.
+Real-time dashboard for electrical meter telemetry. Send raw `frame$...,Z`
+strings to a single HTTP endpoint and the dashboard renders voltage, current,
+power, harmonics, energy, and system health with live sparklines that refresh
+every 2 seconds.
+
+The whole thing — dashboard **and** API — runs on a single Netlify deploy.
+
+```
+https://<your-site>.netlify.app          ← dashboard (React SPA)
+https://<your-site>.netlify.app/api/data ← POST raw frames here
+```
+
+---
+
+## How it works
+
+| Piece     | Tech                              | Where it runs            |
+| --------- | --------------------------------- | ------------------------ |
+| Dashboard | React + Vite + TanStack Query     | Netlify static hosting   |
+| API       | Netlify Function (Node 20)        | Netlify Functions        |
+| Storage   | In-memory inside the function     | The function's container |
+
+The store keeps the latest frame plus a short rolling history. It lives in the
+function's process memory, so it survives across requests while the function
+stays warm and resets to empty when the container goes cold (typically after
+~15 minutes of no traffic). Since the dashboard polls every 2 seconds and your
+meter posts continuously, the function stays warm in normal use.
 
 ---
 
 ## Project layout
 
-This is a **pnpm workspace** with two deployable artifacts:
+This is a pnpm workspace.
 
 ```
 artifacts/
-  meter-dash/    # React + Vite SPA  ->  deploy to Netlify
-  api-server/    # Express 5 server  ->  deploy to Render / Railway / Fly.io
+  meter-dash/             # React + Vite SPA (the dashboard)
+  api-server/             # Local-dev Express server (NOT deployed)
+                          # Shares parser + store code with the function
 lib/
-  api-spec/      # OpenAPI source of truth
-  api-zod/       # Generated Zod schemas
-  api-client-react/  # Generated TanStack Query hooks
-  db/            # Shared db utilities (unused by MeterDash today)
+  api-spec/               # OpenAPI source of truth
+  api-zod/                # Generated Zod schemas
+  api-client-react/       # Generated TanStack Query hooks
+netlify/
+  functions/api.ts        # The single API function (/api/*)
+netlify.toml              # Netlify build + routing config
 ```
-
-Frontend and backend talk to each other purely over HTTP — there is no shared
-runtime. They can be deployed to two completely different hosts.
 
 ---
 
-## Why two different hosts?
-
-The API keeps the last 60 telemetry frames in **process memory**
-(`artifacts/api-server/src/lib/meterStore.ts`). That makes Netlify Functions
-(stateless, cold-start per invocation) a bad fit for the backend — every
-request would land on a fresh process with an empty store.
-
-So:
-
-| Piece     | Type                  | Recommended host                  |
-| --------- | --------------------- | --------------------------------- |
-| Frontend  | Static SPA            | **Netlify**                       |
-| Backend   | Long-running Node     | **Render** (or Railway / Fly.io)  |
-
-If you later move the store to a database (Postgres, Redis, etc.), the backend
-*could* be ported to serverless functions, but the current code assumes a
-single long-lived process.
-
----
-
-## Local development
-
-Requirements: **Node 20+** and **pnpm 9+** (`corepack enable` works).
-
-```bash
-pnpm install
-pnpm --filter @workspace/api-spec run codegen   # generate Zod + React hooks
-pnpm run typecheck                              # sanity check
-```
-
-Run the two services in separate terminals:
-
-```bash
-# Terminal 1 — backend on :8080
-PORT=8080 pnpm --filter @workspace/api-server run dev
-
-# Terminal 2 — frontend on :5173
-PORT=5173 BASE_PATH=/ VITE_API_BASE_URL=http://localhost:8080 \
-  pnpm --filter @workspace/meter-dash run dev
-```
-
-Open http://localhost:5173 and send a test frame from the “Send test frame”
-panel, or via curl:
-
-```bash
-curl -X POST http://localhost:8080/api/data \
-  -H "Content-Type: text/plain" \
-  --data 'frame$EM6400,V1n:239.8,V2n:240.4,V3n:238.9,V12:415.3,V23:416.1,V31:414.8,I1:12.34,I2:11.98,I3:12.21,Vavg:239.7,Iavg:12.18,KW:7.82,KVA:8.11,KVAR:2.34,PF:0.964,FREQ:49.98,THDV1:2.1,THDV2:2.3,THDV3:2.0,THDI1:4.2,THDI2:4.5,THDI3:4.1,KWH_FWD:12345.67,KVAH_FWD:12988.11,KVARH_FWD:4567.22,KWH_REV:12.34,KVAH_REV:15.67,KVARH_REV:3.45,INTR:5,In:0.42,IUNB:3.2,VUNB:1.1,RSSI:-71,MTR:1,GPRS:1,STALE:0,Z'
-```
-
-JSON form is also accepted: `-H "Content-Type: application/json" -d '{"raw":"frame$...,Z"}'`.
-
----
-
-## API reference
-
-All routes live under `/api` and are described in `lib/api-spec/openapi.yaml`.
-
-| Method | Path           | Description                                             |
-| ------ | -------------- | ------------------------------------------------------- |
-| GET    | `/api/healthz` | Health probe.                                           |
-| POST   | `/api/data`    | Ingest one raw frame (`text/plain` or `{"raw": "..."}`).|
-| GET    | `/api/data`    | Latest parsed payload (or `null`).                      |
-| GET    | `/api/history` | Last 60 frames, newest first.                           |
-| GET    | `/api/summary` | Aggregated metrics (peak kW, avg PF, RSSI, etc.).       |
-
----
-
-## Deploying the backend (Render — recommended)
-
-Render gives you a free always-on Node web service, which fits the in-memory
-store model perfectly.
-
-1. Push this repo to GitHub.
-2. In Render, click **New → Web Service** and connect the repo.
-3. Fill in:
-   - **Environment**: `Node`
-   - **Region**: closest to your meters
-   - **Branch**: `main`
-   - **Root Directory**: leave blank (we build from the repo root)
-   - **Build Command**:
-     ```
-     corepack enable && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-server run build
-     ```
-   - **Start Command**:
-     ```
-     pnpm --filter @workspace/api-server run start
-     ```
-4. Add an environment variable:
-   - `NODE_VERSION` = `20`
-   - `PORT` is provided automatically by Render — do **not** set it yourself.
-5. Click **Create Web Service**. After the first deploy, copy the public URL
-   (e.g. `https://meter-dash-api.onrender.com`). You will paste this into
-   Netlify in the next section.
-
-Test it:
-
-```bash
-curl https://meter-dash-api.onrender.com/api/healthz
-```
-
-### Alternative: Railway
-
-1. New project → Deploy from GitHub repo.
-2. Set the same Build Command and Start Command as above.
-3. Set `NODE_VERSION=20`. `PORT` is injected by Railway.
-
-### Alternative: Fly.io
-
-Use a small `Dockerfile` (Node 20, run `pnpm install`, run the build command,
-then `node artifacts/api-server/dist/index.mjs`). Fly handles port binding via
-the `internal_port` setting in `fly.toml`.
-
-### CORS
-
-The API already enables permissive CORS (`cors()` middleware in
-`artifacts/api-server/src/app.ts`), so the Netlify frontend can call it from a
-different origin out of the box.
-
----
-
-## Deploying the frontend (Netlify)
+## Deploying to Netlify
 
 A `netlify.toml` is committed at the repo root and configures everything for
-you. You only need to set one environment variable.
+you. There are **no environment variables to set**.
 
 ### Option A — Netlify UI
 
 1. Push this repo to GitHub.
-2. In Netlify, click **Add new site → Import an existing project** and pick the
-   repo. Netlify will read `netlify.toml`, so you can leave the build/publish
+2. In Netlify, click **Add new site → Import an existing project** and pick
+   the repo. Netlify reads `netlify.toml`, so leave the build/publish/function
    fields untouched.
-3. Open **Site settings → Environment variables** and add:
+3. Click **Deploy site**.
 
-   | Key                  | Value                                          |
-   | -------------------- | ---------------------------------------------- |
-   | `VITE_API_BASE_URL`  | The full backend URL from Render, e.g. `https://meter-dash-api.onrender.com` |
-
-4. Click **Deploy site**. Netlify will run the build command from
-   `netlify.toml`, output static files to `artifacts/meter-dash/dist/public`,
-   and publish them.
+That's it. The dashboard and API will both be live at your `*.netlify.app`
+URL.
 
 ### Option B — Netlify CLI
 
@@ -176,71 +72,127 @@ you. You only need to set one environment variable.
 npm i -g netlify-cli
 netlify login
 netlify init           # link to a new or existing site
-netlify env:set VITE_API_BASE_URL https://meter-dash-api.onrender.com
 netlify deploy --build --prod
 ```
 
 ### What `netlify.toml` does
 
-```
-publish = "artifacts/meter-dash/dist/public"
-command = corepack enable && pnpm install --frozen-lockfile
-          && pnpm --filter @workspace/api-spec run codegen
-          && BASE_PATH=/ PORT=4173 pnpm --filter @workspace/meter-dash run build
-```
-
-- `BASE_PATH=/` tells Vite the app is served from the domain root.
-- `PORT` is required by `vite.config.ts` even at build time, so we pass a
-  dummy value.
-- The SPA fallback redirect (`/* → /index.html 200`) is included so any
-  client-side route resolves to `index.html`.
+- Installs pnpm via Corepack and runs `pnpm install --frozen-lockfile`.
+- Generates Zod schemas + React Query hooks from the OpenAPI spec.
+- Builds the SPA into `artifacts/meter-dash/dist/public`.
+- Bundles `netlify/functions/api.ts` and routes `/api/*` to it.
+- Adds a SPA fallback so any client-side route resolves to `index.html`.
 
 ---
 
-## Environment variables summary
+## Posting frames from your meter
 
-### Backend (Render / Railway / Fly.io)
+Point the meter at:
 
-| Variable | Required | Notes                                                |
-| -------- | -------- | ---------------------------------------------------- |
-| `PORT`   | yes      | Provided automatically by every major host.          |
+```
+https://<your-site>.netlify.app/api/data
+```
 
-### Frontend (Netlify)
+The endpoint accepts the raw frame either as plain text (recommended for
+embedded meters) or wrapped in JSON:
 
-| Variable               | Required | Notes                                                  |
-| ---------------------- | -------- | ------------------------------------------------------ |
-| `VITE_API_BASE_URL`    | yes      | Absolute URL of the deployed backend, no trailing `/`. |
+```bash
+# Plain text
+curl -X POST https://<your-site>.netlify.app/api/data \
+  -H "Content-Type: text/plain" \
+  --data 'frame$EM6400,V1n:239.8,V2n:240.4,V3n:238.9,KW:7.82,PF:0.964,FREQ:49.98,RSSI:-71,MTR:1,GPRS:1,STALE:0,Z'
 
-If you forget `VITE_API_BASE_URL`, the frontend will issue requests to its own
-origin (`/api/...`) and they will 404 because Netlify is only serving static
-files.
+# JSON
+curl -X POST https://<your-site>.netlify.app/api/data \
+  -H "Content-Type: application/json" \
+  -d '{"raw":"frame$EM6400,V1n:239.8,KW:7.82,STALE:0,Z"}'
+```
+
+The dashboard will pick up the new frame within 2 seconds.
 
 ---
 
-## Pointing a real meter at production
+## API reference
 
-Configure the meter to `POST` raw `frame$...,Z` strings to:
+All routes are served from the same Netlify Function under `/api`.
+
+| Method | Path           | Description                                          |
+| ------ | -------------- | ---------------------------------------------------- |
+| GET    | `/api/healthz` | Health probe — returns `{ "ok": true }`.             |
+| POST   | `/api/data`    | Ingest one frame (`text/plain` or `{"raw": "..."}`). |
+| GET    | `/api/data`    | Latest parsed payload (or `null`).                   |
+| GET    | `/api/history` | Rolling history, newest first (up to 60 frames).     |
+| GET    | `/api/summary` | Aggregated metrics (peak kW, avg PF, RSSI, etc.).    |
+
+### Frame format
 
 ```
-https://<your-backend-host>/api/data
+frame$<METER_ID>,KEY1:VALUE,KEY2:VALUE,...,Z
 ```
 
-Either as `Content-Type: text/plain` with the raw string as the body, or as
-`Content-Type: application/json` with `{"raw": "frame$...,Z"}`. The dashboard
-will pick up new frames within 2 seconds.
+- Must start with `frame$` and end with `,Z`.
+- The first comma-separated field after `frame$` is the meter id.
+- Each subsequent field is `KEY:VALUE`. Numeric values are auto-converted.
+
+A representative example:
+
+```
+frame$EM6400,V1n:239.8,V2n:240.4,V3n:238.9,V12:415.3,V23:416.1,V31:414.8,
+I1:12.34,I2:11.98,I3:12.21,Vavg:239.7,Iavg:12.18,KW:7.82,KVA:8.11,KVAR:2.34,
+PF:0.964,FREQ:49.98,THDV1:2.1,THDV2:2.3,THDV3:2.0,THDI1:4.2,THDI2:4.5,
+THDI3:4.1,KWH_FWD:12345.67,KVAH_FWD:12988.11,KVARH_FWD:4567.22,
+KWH_REV:12.34,KVAH_REV:15.67,KVARH_REV:3.45,INTR:5,In:0.42,IUNB:3.2,
+VUNB:1.1,RSSI:-71,MTR:1,GPRS:1,STALE:0,Z
+```
+
+---
+
+## Local development
+
+Requirements: **Node 20+** and **pnpm 9+** (`corepack enable` works).
+
+### Run everything against the real Netlify Function locally
+
+This is the closest match to production:
+
+```bash
+pnpm install
+pnpm --filter @workspace/api-spec run codegen
+npm i -g netlify-cli
+netlify dev
+```
+
+`netlify dev` serves the SPA, runs the function, and routes `/api/*` to it on
+a single port (default `http://localhost:8888`).
+
+### Or run the Express dev server (faster reloads)
+
+The `artifacts/api-server` package is the same parser and store code wrapped in
+Express, used during Replit/local development.
+
+```bash
+# Terminal 1 — backend on :8080
+PORT=8080 pnpm --filter @workspace/api-server run dev
+
+# Terminal 2 — frontend on :5173
+PORT=5173 BASE_PATH=/ pnpm --filter @workspace/meter-dash run dev
+```
 
 ---
 
 ## Troubleshooting
 
-- **Netlify build fails on `pnpm install`**: confirm `NODE_VERSION=20` and
+- **Netlify build fails on `pnpm install`** — confirm `NODE_VERSION=20` and
   `PNPM_VERSION=9` are set in `netlify.toml` (they are by default).
-- **Frontend loads but every API call 404s**: `VITE_API_BASE_URL` is missing
-  or wrong. It must be the full public URL of the backend.
-- **CORS error in the browser console**: the backend service is unreachable or
-  returning a non-2xx; the request is being preflighted but the response
-  doesn't include CORS headers because it's an error page from the host
-  (not from the Express app). Check the backend logs.
-- **Render free tier sleeps after 15 min of inactivity**: the first request
-  after a sleep may take ~30s to wake the dyno. Upgrade the plan or add a
-  cron pinger if you can't tolerate cold starts.
+- **`/api/...` returns 404** — make sure `netlify/functions/api.ts` was
+  deployed. Check the **Functions** tab in the Netlify dashboard; you should
+  see a function called `api`.
+- **History feels short / metrics look reset** — the function container went
+  cold. The rolling window starts fresh when a new container spins up. Send a
+  few more frames and it'll fill back up. To keep things warm, point a cron
+  pinger at `/api/healthz` every few minutes, or post telemetry continuously.
+- **CORS error in the browser** — should not happen because the dashboard and
+  API are on the same origin. If you call the API from another origin, the
+  function already returns permissive CORS headers (`*`).
+- **Frame rejected with 400** — verify the string starts with `frame$` and
+  ends with `,Z`.
