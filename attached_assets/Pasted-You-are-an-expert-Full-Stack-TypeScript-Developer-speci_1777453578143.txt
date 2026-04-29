@@ -1,0 +1,132 @@
+You are an expert Full-Stack TypeScript Developer specializing in Next.js (App Router), React, and Tailwind CSS.
+
+Objective: Build a real-time web application named MeterDash for monitoring electrical meter data. The app requires two main components:
+
+A POST API endpoint to receive and parse a specific raw telemetry string.
+
+A Dashboard UI to display the parsed data in categorized tables.
+
+Tech Stack:
+
+Framework: Next.js (App Router)
+
+Language: TypeScript
+
+Styling: Tailwind CSS
+
+State Management/Real-time: SWR (for client-side polling) and an in-memory global variable (for development simplicity) to store the latest parsed payload.
+
+Requirement 1: The Raw String Parser Utility
+Create a robust parser function to handle the incoming telemetry string.
+Example Input:
+frame$EM6400,V1n:239.8,V2n:240.4,V3n:238.9,V12:415.3,V23:416.1,V31:414.8,I1:12.34,I2:11.98,I3:12.21,Vavg:239.7,Iavg:12.18,KW:7.82,KVA:8.11,KVAR:2.34,PF:0.964,FREQ:49.98,THDV1:2.1,THDV2:2.3,THDV3:2.0,THDI1:4.2,THDI2:4.5,THDI3:4.1,KWH_FWD:12345.67,KVAH_FWD:12988.11,KVARH_FWD:4567.22,KWH_REV:12.34,KVAH_REV:15.67,KVARH_REV:3.45,INTR:5,In:0.42,IUNB:3.2,VUNB:1.1,RSSI:-71,MTR:1,GPRS:1,STALE:0,Z
+
+Parsing Logic Rules:
+
+Verify the string starts with frame$ and ends with ,Z. If not, throw a "Malformed string" error.
+
+Strip the frame$ prefix and ,Z suffix.
+
+Split the remaining string by ,.
+
+The first element (e.g., EM6400) is the meterId.
+
+Iterate through the remaining elements. Split each element by : to extract the key and value.
+
+Convert numerical values to Number, but keep them as strings if conversion results in NaN.
+
+Return a strongly-typed JSON object with meterId, a timestamp, and a data object containing all key-value pairs.
+
+Requirement 2: The API Routes
+Create two API endpoints in the Next.js app/api/data/route.ts file:
+
+POST /api/data: Accepts a Content-Type: text/plain or application/json payload containing the raw string. It must pass the string through the parser utility and store the resulting JSON object in a global variable (e.g., global.latestMeterData).
+
+GET /api/data: Returns the latestMeterData as a JSON response.
+
+Requirement 3: The Dashboard Frontend (/dashboard)
+Create a responsive Dashboard page at app/dashboard/page.tsx that polls the GET /api/data endpoint every 2 seconds using SWR or React useEffect`.
+
+UI/UX Specifications:
+
+Header: Display the application name "MeterDash", the current meterId, and the timestamp of the last received data. Include a visual "Live" indicator that pulses green if STALE:0 and red if STALE:1.
+
+Layout: A CSS Grid layout with distinct "Cards" for different parameter categories.
+
+Data Visuals: Inside each category card, display a clean table or list row. The left side should show the parameter name, and the right side should show the parsed value WITH its corresponding unit.
+
+Data Grouping & Unit Dictionary (Use this to build the UI cards):
+
+Voltage (Unit: V)
+
+V1n, V2n, V3n (Phase-Neutral)
+
+V12, V23, V31 (Phase-Phase)
+
+Vavg (Average)
+
+Current (Unit: A)
+
+I1, I2, I3 (Phase Currents)
+
+In (Neutral Current)
+
+Iavg (Average)
+
+Power & Frequency
+
+KW (Active Power, Unit: kW)
+
+KVA (Apparent Power, Unit: kVA)
+
+KVAR (Reactive Power, Unit: kVAR)
+
+PF (Power Factor)
+
+FREQ (Frequency, Unit: Hz)
+
+Harmonics & Unbalance (Unit: %)
+
+THDV1, THDV2, THDV3 (Voltage THD)
+
+THDI1, THDI2, THDI3 (Current THD)
+
+VUNB (Voltage Unbalance)
+
+IUNB (Current Unbalance)
+
+Energy Import (Forward)
+
+KWH_FWD (Unit: kWh)
+
+KVAH_FWD (Unit: kVAh)
+
+KVARH_FWD (Unit: kVARh)
+
+Energy Export (Reverse)
+
+KWH_REV (Unit: kWh)
+
+KVAH_REV (Unit: kVAh)
+
+KVARH_REV (Unit: kVARh)
+
+System Health & Events
+
+INTR (Interruptions)
+
+RSSI (Signal Strength, Unit: dBm)
+
+MTR (Meter Status: 1 = OK, 0 = Fail)
+
+GPRS (Network Status: 1 = OK, 0 = Fail)
+
+Please generate the complete codebase step-by-step:
+
+types.ts for TypeScript interfaces.
+
+utils/parser.ts for the string parser function.
+
+app/api/data/route.ts for the GET and POST endpoints.
+
+app/dashboard/page.tsx for the UI.

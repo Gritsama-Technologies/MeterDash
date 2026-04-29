@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-}
+/**
+ * A parsed telemetry value. Numeric where possible, otherwise raw string.
+ */
+export type MeterValue = number | string;
